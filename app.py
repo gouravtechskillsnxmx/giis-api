@@ -271,13 +271,21 @@ class FollowupRow(BaseModel):
 # ==========================
 # Auth helpers
 # ==========================
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+import bcrypt
 
+def hash_password(password: str) -> str:
+    pw = password.encode("utf-8")
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(pw, salt).decode("utf-8")
 
-def hash_password(pw: str) -> str:
-    return pwd_context.hash(pw)
-
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return bcrypt.checkpw(
+            password.encode("utf-8"),
+            password_hash.encode("utf-8")
+        )
+    except Exception:
+        return False
 
 def create_access_token(data: dict, expires_minutes: int = ACCESS_TOKEN_EXPIRE_MINUTES) -> str:
     to_encode = dict(data)
