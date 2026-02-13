@@ -552,60 +552,44 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
 
 @app.post("/dev/seed")
 def dev_seed(db: Session = Depends(get_db)):
-    admin_email = "admin@gouravnxmx.demo"
-    tenant = db.query(Tenant).filter(Tenant.name == "GouravNxMx Demo").first()
-    if not tenant:
-        tenant = Tenant(name="GouravNxMx Demo", country="IN", timezone="Asia/Kolkata")
-        db.add(tenant)
-        db.commit()
-        db.refresh(tenant)
+    try:
+        admin_email = "admin@gouravnxmx.demo"
 
-    user = db.query(User).filter(User.email == admin_email).first()
-    if not user:
-        user = User(
-            tenant_id=tenant.id,
-            role="admin",
-            name="Demo Admin",
-            email=admin_email,
-            password_hash=hash_password("admin123"),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        tenant = db.query(Tenant).filter(Tenant.name == "GouravNxMx Demo").first()
+        if not tenant:
+            tenant = Tenant(name="GouravNxMx Demo", country="IN", timezone="Asia/Kolkata")
+            db.add(tenant)
+            db.commit()
+            db.refresh(tenant)
 
-    existing = db.query(Client).filter(Client.tenant_id == tenant.id).count()
-    if existing == 0:
-        c1 = Client(tenant_id=tenant.id, name="Amit Shah", phone="919820000001", age=34, income_band="5-10L", city="Mumbai", engagement_score=62)
-        c2 = Client(tenant_id=tenant.id, name="Neha Patil", phone="919820000002", age=41, income_band="10-25L", city="Navi Mumbai", engagement_score=45)
-        c3 = Client(tenant_id=tenant.id, name="Rohit Mehta", phone="919820000003", age=28, income_band="<5L", city="Mumbai", engagement_score=70)
-        db.add_all([c1, c2, c3])
-        db.commit()
-        for c in [c1, c2, c3]:
-            db.refresh(c)
+        user = db.query(User).filter(User.email == admin_email).first()
+        if not user:
+            user = User(
+                tenant_id=tenant.id,
+                role="admin",
+                name="Demo Admin",
+                email=admin_email,
+                password_hash=hash_password("admin123"),
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
-        today = date.today()
-        p1 = Policy(tenant_id=tenant.id, client_id=c1.id, carrier="LIC", policy_type="endowment",
-                    premium_amount=36000, premium_frequency="yearly", start_date=today.replace(day=1),
-                    maturity_date=today.replace(year=today.year+6), sum_assured=2000000, commission_rate=0.05)
-        p2 = Policy(tenant_id=tenant.id, client_id=c2.id, carrier="LIC", policy_type="ulip",
-                    premium_amount=5000, premium_frequency="monthly", start_date=today.replace(day=1),
-                    maturity_date=today.replace(year=today.year+10), sum_assured=1500000, commission_rate=0.03)
-        p3 = Policy(tenant_id=tenant.id, client_id=c2.id, carrier="Star Health", policy_type="health",
-                    premium_amount=12000, premium_frequency="yearly", start_date=today.replace(day=1),
-                    maturity_date=None, sum_assured=500000, commission_rate=0.1)
-        db.add_all([p1, p2, p3])
-        db.commit()
+        # Seed clients/policies/interactions if empty
+        existing = db.query(Client).filter(Client.tenant_id == tenant.id).count()
+        if existing == 0:
+            # (keep your existing seed data block here exactly as it is)
+            pass
 
-        i1 = Interaction(tenant_id=tenant.id, client_id=c1.id, user_id=user.id, channel="call",
-                         occurred_at=now_utc()-timedelta(days=12), notes="Discussed renewal", sentiment_score=0.3,
-                         objection_tags_json=json.dumps(["price"]))
-        i2 = Interaction(tenant_id=tenant.id, client_id=c2.id, user_id=user.id, channel="meeting",
-                         occurred_at=now_utc()-timedelta(days=45), notes="ULIP explanation", sentiment_score=-0.2,
-                         objection_tags_json=json.dumps(["returns"]))
-        db.add_all([i1, i2])
-        db.commit()
+        return {"ok": True, "tenant": {"name": tenant.name, "id": tenant.id},
+                "login": {"email": admin_email, "password": "admin123"}}
 
-    return {"ok": True, "tenant": {"name": tenant.name, "id": tenant.id}, "login": {"email": admin_email, "password": "admin123"}}
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"DB integrity error: {str(e)}")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Seed failed: {type(e).__name__}: {str(e)}")
 
 
 @app.get("/clients", response_model=List[ClientOut])
