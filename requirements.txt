@@ -10,5 +10,6 @@ PyJWT==2.9.0
 fastapi
 uvicorn
 python-multipart
+passlib
 
 
